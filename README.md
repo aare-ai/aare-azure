@@ -1,2 +1,2 @@
 # aare-azure
-aare.ai for Azure
+Coming soon! 
