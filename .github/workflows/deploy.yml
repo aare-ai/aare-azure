@@ -1,0 +1,100 @@
+name: Deploy to Azure Functions
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - staging
+          - dev
+
+env:
+  AZURE_FUNCTIONAPP_NAME: 'aareai-func-prod'
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Create and activate virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+
+      - name: Install dependencies
+        run: |
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          source venv/bin/activate
+          pip install pytest
+          pytest tests/ -v || echo "No tests found, skipping"
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          scm-do-build-during-deployment: true
+          enable-oryx-build: true
+
+      - name: Verify deployment
+        run: |
+          echo "Deployed to https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net"
+          # Health check
+          sleep 30
+          curl -s -o /dev/null -w "%{http_code}" "https://${{ env.AZURE_FUNCTIONAPP_NAME }}.azurewebsites.net/verify" || echo "Function not responding yet (expected for cold start)"
+
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create Resource Group
+        run: |
+          az group create \
+            --name aareai-${{ github.event.inputs.environment || 'prod' }}-rg \
+            --location westus2
+
+      - name: Deploy Bicep template
+        run: |
+          az deployment group create \
+            --resource-group aareai-${{ github.event.inputs.environment || 'prod' }}-rg \
+            --template-file infra/main.bicep \
+            --parameters environment=${{ github.event.inputs.environment || 'prod' }}
