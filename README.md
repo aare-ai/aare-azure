@@ -1,2 +1,0 @@
-# aare-azure
-Coming soon! 
