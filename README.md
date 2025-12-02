@@ -33,11 +33,7 @@ Azure Functions implementation of the aare.ai Z3 SMT verification engine.
 aare-azure/
 ├── function_app.py          # Main Azure Functions entry point
 ├── handlers/
-│   ├── __init__.py
-│   ├── llm_parser.py        # LLM output text parser
-│   ├── formula_compiler.py  # Compile JSON formulas to Z3
-│   ├── ontology_loader.py   # Loads rules from Blob Storage
-│   └── smt_verifier.py      # Z3 theorem prover engine
+│   └── __init__.py
 ├── ontologies/              # Compliance rule definitions
 ├── infra/
 │   ├── main.bicep           # Infrastructure as Code
@@ -50,6 +46,9 @@ aare-azure/
 ├── requirements.txt         # Python dependencies
 └── README.md
 ```
+
+> **Note:** The core verification engine (LLMParser, SMTVerifier, FormulaCompiler, OntologyLoader)
+> is provided by the [aare-core](https://github.com/aare-ai/aare-core) package.
 
 ## Local Development
 
